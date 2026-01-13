@@ -57,13 +57,14 @@ description: 将文件按大小分桶并输出报告。
 
 ## 使用方式
 1) 初始化 SkillManager（可限制技能集合）
+
 ```python
-from SkillManager import SkillManager
+from langgraph_ext.skill_manager import SkillManager
 
 sm = SkillManager(
-skill_dir="skills",
-venv_path=".venv",
-enabled_skills=["file-size-classification", "pdf-reader"],
+  skill_dir="src/test/skills",
+  venv_path=".venv",
+  enabled_skills=["file-size-classification", "pdf-reader"],
 )
 
 ```

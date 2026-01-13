@@ -7,11 +7,11 @@ from langchain.messages import SystemMessage, ToolMessage
 from langchain.tools import tool
 from langgraph.graph import StateGraph, START, END
 
-from ..skills.registry import SkillRegistry
-from ..skills.loader import SkillLoader
-from ..skills.executor import SkillExecutor
+from langgraph_ext.registry import SkillRegistry
+from langgraph_ext.loader import SkillLoader
+from langgraph_ext.executor import SkillExecutor
 from .state import SkillAgentState
-from skills.skill_manager import SkillManager
+from langgraph_ext.skill_manager import SkillManager
 
 # 严格匹配协议输出，避免“随便提到 skill 名”就误触发
 _SKILL_SELECT_RE = re.compile(r"^I will use the (.+?) skill\s*$", re.IGNORECASE)
