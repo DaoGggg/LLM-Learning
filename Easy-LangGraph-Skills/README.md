@@ -73,11 +73,11 @@ system_prompt = "你是一个有帮助的助手。\n" + sm.get_skill_summary_pro
 ```
 3) 检测模型选择了哪个 skill
 
-模型应严格输出：
-
+- 模型应严格输出：
+```plaintext
 I will use the <skill name> skill
-
-随后：
+```
+- 随后：
 ```python
 skill = sm.detect_skill_trigger(model_text)
 if skill:
@@ -85,7 +85,7 @@ payload = sm.build_skill_docs_payload(skill)
 ```
 4) 注入 Skill Docs Payload
 
-把 payload 作为 system message 注入对话，使模型读取完整 SKILL.md（并看到 scripts/reference 清单）。
+- 把 payload 作为 system message 注入对话，使模型读取完整 SKILL.md（并看到 scripts/reference 清单）。
 
 5) 抽取并执行命令
 ```python
