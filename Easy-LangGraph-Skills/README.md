@@ -1,4 +1,4 @@
-# LangGraph Skill 扩展组件 + Claude Skills 目录标准（中文说明）
+# LangGraph Skill 扩展组件
 
 本项目实现一套 **Claude 风格 Skills（技能）管理层**，并提供 **面向 LangGraph 的 Skill 运行时能力**。
 核心遵循 **渐进披露（Progressive Disclosure）** 原则：
