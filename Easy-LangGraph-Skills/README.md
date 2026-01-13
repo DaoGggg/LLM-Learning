@@ -56,13 +56,16 @@ description: 将文件按大小分桶并输出报告。
 
 ## 使用方式
 1) 初始化 SkillManager（可限制技能集合）
-   from SkillManager import SkillManager
+'''
+from SkillManager import SkillManager
 
 sm = SkillManager(
 skill_dir="skills",
 venv_path=".venv",
 enabled_skills=["file-size-classification", "pdf-reader"],
 )
+
+'''
 
 2) 生成技能元数据摘要 prompt（放入 Agent system prompt）
    system_prompt = "你是一个有帮助的助手。\n" + sm.get_skill_summary_prompt()
