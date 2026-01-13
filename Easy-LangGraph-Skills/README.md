@@ -56,7 +56,7 @@ description: 将文件按大小分桶并输出报告。
 
 ## 使用方式
 1) 初始化 SkillManager（可限制技能集合）
-'''
+```python
 from SkillManager import SkillManager
 
 sm = SkillManager(
@@ -65,11 +65,12 @@ venv_path=".venv",
 enabled_skills=["file-size-classification", "pdf-reader"],
 )
 
-'''
+```
 
 2) 生成技能元数据摘要 prompt（放入 Agent system prompt）
-   system_prompt = "你是一个有帮助的助手。\n" + sm.get_skill_summary_prompt()
-
+```python   
+system_prompt = "你是一个有帮助的助手。\n" + sm.get_skill_summary_prompt()
+```
 3) 检测模型选择了哪个 skill
 
 模型应严格输出：
@@ -77,16 +78,18 @@ enabled_skills=["file-size-classification", "pdf-reader"],
 I will use the <skill name> skill
 
 随后：
-
+```python
 skill = sm.detect_skill_trigger(model_text)
 if skill:
 payload = sm.build_skill_docs_payload(skill)
-
+```
 4) 注入 Skill Docs Payload
 
 把 payload 作为 system message 注入对话，使模型读取完整 SKILL.md（并看到 scripts/reference 清单）。
 
 5) 抽取并执行命令
+```python
    cmds = sm.extract_commands_from_text(model_text_with_codeblock)
    for cmd in cmds:
    ok, out, err = sm.parse_and_execute_command(cmd, working_dir=".")
+   ```
