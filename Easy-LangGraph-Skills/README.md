@@ -40,16 +40,17 @@
 
 ## Skill 文件夹规范（Claude 标准）
 
-每个 Skill 必须是一个文件夹：
-一个文件夹 = 一个 Skill
-必须有 SKILL.md
-SKILL.md 必须包含 YAML frontmatter，例如：
----
+- 每个 Skill 必须是一个文件夹：
+   - 一个文件夹 = 一个 Skill
+  - 必须有 SKILL.md
+  - SKILL.md 必须包含 YAML frontmatter，例如：
+```plaintext
 
 name: file-size-classification
 description: 将文件按大小分桶并输出报告。
 
----
+```
+
 ### 可选目录：
 - scripts/：脚本文件
 - reference/ 或 resources/：参考资料（可以是 md/json/图片等）
