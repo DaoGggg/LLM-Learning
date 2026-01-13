@@ -56,6 +56,8 @@ description: 将文件按大小分桶并输出报告。
 - reference/ 或 resources/：参考资料（可以是 md/json/图片等）
 
 ## 使用方式
+通过create_skill_agent()的方式构建一个Skill智能体（本质上就是一个tool NODE + SKILL NODE 和 LLM NODE进行迭代） or 通过下面的方式在LLM中使用Skill（更灵活）
+
 1) 初始化 SkillManager（可限制技能集合）
 
 ```python
