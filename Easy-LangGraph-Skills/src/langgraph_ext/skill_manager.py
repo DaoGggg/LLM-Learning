@@ -15,9 +15,10 @@ Design goals:
 - Script lookup is indexed at scan-time for fast resolution.
 - Optional enabled_skills controls which skills are exposed/usable.
 """
-
 from __future__ import annotations
 
+import difflib
+import os
 import re
 import subprocess
 from dataclasses import dataclass, field
@@ -91,6 +92,41 @@ class SkillManager:
         self._enabled_skills: Optional[set[str]] = set(enabled_skills) if enabled_skills else None
 
         self._scan_skills()
+
+    def _normalize_script_token(self, token: str) -> str:
+        """把模型输出的脚本 token 归一化为 index key：只取文件名 + 补 .py"""
+        token = (token or "").strip()
+        token = Path(token).name  # 兼容 xhs-viral-title/scripts/xxx.py 这种输出
+        if token and not token.lower().endswith(".py"):
+            token += ".py"
+        return token
+
+    def _fuzzy_match_script(self, script_name: str) -> Optional[Tuple[str, Path]]:
+        """
+        在已索引脚本中做模糊匹配，只返回 index 里的脚本（安全）。
+        返回: (best_name, best_path)
+        """
+        candidates: List[str] = list(self._script_index.keys())
+        if not candidates:
+            return None
+
+        # 先对“去掉 .py 的 stem”也做一轮匹配，提升命中率
+        name_stem = script_name[:-3] if script_name.lower().endswith(".py") else script_name
+        stem_map = {k[:-3] if k.lower().endswith(".py") else k: k for k in candidates}
+
+        # 先匹配完整文件名
+        best = difflib.get_close_matches(script_name, candidates, n=1, cutoff=0.60)
+        if best:
+            k = best[0]
+            return k, self._script_index[k]
+
+        # 再匹配 stem（例如 generate_xhs_title vs gen_xhs_titles）
+        best2 = difflib.get_close_matches(name_stem, list(stem_map.keys()), n=1, cutoff=0.55)
+        if best2:
+            k = stem_map[best2[0]]
+            return k, self._script_index[k]
+
+        return None
 
     def build_skill_docs_payload(
             self,
@@ -404,6 +440,33 @@ class SkillManager:
             logger.error(f"Command execution failed: {e}")
             return False, "", str(e)
 
+
+
+    def _resolve_venv_python(self) -> str:
+        """
+        Return python executable path for the configured venv (default .venv).
+        Cross-platform (Windows / macOS / Linux). Falls back to current interpreter.
+        """
+        project_root = Path(__file__).parent.parent  # 与你现有逻辑保持一致
+        venv_root = project_root / self.venv_path
+
+        # Windows: .venv/Scripts/python.exe
+        if os.name == "nt":
+            cand = venv_root / "Scripts" / "python.exe"
+            if cand.exists():
+                return str(cand)
+            cand = venv_root / "Scripts" / "python"
+            if cand.exists():
+                return str(cand)
+        else:
+            # POSIX: .venv/bin/python
+            cand = venv_root / "bin" / "python"
+            if cand.exists():
+                return str(cand)
+
+        # 最稳的 fallback：当前进程解释器
+        return sys.executable or "python"
+
     def _execute_python_command(self, command: str, cwd: Path) -> Tuple[bool, str, str]:
         """
         Execute a Python command with venv activation.
@@ -425,36 +488,31 @@ class SkillManager:
             logger.error(f"Invalid python command format: {command}")
             return False, "", "Invalid command format"
 
-        script_name = parts[1]
+        script_name_raw = parts[1]
+        script_name = self._normalize_script_token(script_name_raw)
+
+        script_path = self._locate_skill_script(script_name)
         script_args = parts[2:] if len(parts) > 2 else []
 
-        script_path = Path(script_name)
-        if not script_path.is_absolute():
-            script_path = self._locate_skill_script(script_name)
-            if not script_path:
-                logger.error(f"Could not locate script: {script_name}")
-                return False, "", f"Script not found: {script_name}"
+        # ✅ 自动纠错：精确找不到就模糊匹配
+        if not script_path:
+            guess = self._fuzzy_match_script(script_name)
+            if guess:
+                guessed_name, guessed_path = guess
+                logger.warning(
+                    f"Script '{script_name_raw}' not found. Auto-correct to '{guessed_name}'."
+                )
+                script_path = guessed_path
+            else:
+                available = ", ".join(sorted(self._script_index.keys()))
+                return False, "", (
+                    f"Could not locate script: {script_name_raw}. "
+                    f"Available scripts: {available}"
+                )
 
-        if not script_path.exists():
-            logger.error(f"Script does not exist: {script_path}")
-            return False, "", f"Script not found: {script_name}"
-
-        project_root = Path(__file__).parent.parent
-        venv_activate = project_root / self.venv_path / "bin" / "activate"
-
-        if venv_activate.exists():
-            python_executable = project_root / self.venv_path / "bin" / "python"
-            if not python_executable.exists():
-                python_executable = "python"
-        else:
-            logger.warning(f"Virtual environment not found at {self.venv_path}, running without venv")
-            python_executable = "python"
-
-        shell_cmd = [str(python_executable), str(script_path)] + script_args
-
-        logger.debug(f"Executing (list form): {shell_cmd}")
-        logger.debug(f"Working directory: {cwd}")
-
+        # 后面继续用 script_path 执行
+        python_executable = self._resolve_venv_python()
+        shell_cmd = [python_executable, str(script_path)] + script_args
         return self._run_subprocess(shell_cmd, cwd)
 
     def _execute_write_file_command(self, command: str, cwd: Path) -> Tuple[bool, str, str]:
@@ -530,34 +588,28 @@ class SkillManager:
         shell_cmd = ["/bin/bash", "-c", command]
         return self._run_subprocess(shell_cmd, cwd)
 
-    def _run_subprocess(self, cmd: List[str], cwd: Path) -> Tuple[bool, str, str]:
+    def _run_subprocess(self, cmd: list[str], cwd: Path):
         try:
+            cwd = Path(cwd).resolve()
+            if not cwd.exists() or not cwd.is_dir():
+                cwd = Path.cwd().resolve()
+
             result = subprocess.run(
                 cmd,
                 cwd=str(cwd),
                 capture_output=True,
                 text=True,
+                encoding="utf-8",      # ✅ 强制 UTF-8
+                errors="replace",      # ✅ 解码失败也不崩，替换为 �
                 timeout=300,
             )
-
-            success = result.returncode == 0
-            stdout = result.stdout
-            stderr = result.stderr
-
-            if success:
-                logger.debug(f"Command succeeded (exit code: {result.returncode})")
-            else:
-                logger.error(f"Command failed (exit code: {result.returncode})")
-
-            return success, stdout, stderr
-
+            ok = result.returncode == 0
+            return ok, result.stdout or "", result.stderr or ""
         except subprocess.TimeoutExpired:
-            logger.error("Command timed out after 300 seconds")
-            return False, "", "Command timed out after 300 seconds"
+            return False, "", "命令执行超时（300 秒）"
         except Exception as e:
-            logger.error(f"Subprocess execution failed: {e}")
-            return False, "", str(e)
-
+            # ✅ 任何异常也保证返回 str
+            return False, "", f"Subprocess failed: {e}"
     # -------------------------
     # Command extraction (kept as-is)
     # -------------------------
