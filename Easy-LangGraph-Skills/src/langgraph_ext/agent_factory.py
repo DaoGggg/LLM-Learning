@@ -3,8 +3,9 @@ from __future__ import annotations
 import re
 from typing import Literal, Optional
 
-from langchain.messages import SystemMessage, ToolMessage
+
 from langchain.tools import tool
+from langchain_core.messages import ToolMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
 
 from langgraph_ext.registry import SkillRegistry
@@ -57,6 +58,7 @@ def create_skill_agent(
 
     def skill_docs_node(state: SkillAgentState):
         skill = state.get("selected_skill")
+
         if not skill:
             return {"skill_docs_injected": False}
 
@@ -77,13 +79,25 @@ def create_skill_agent(
         }
 
     def tool_node(state: SkillAgentState):
-        last = state["messages"][-1]
+        # 从后往前找最近一个真正包含 tool_calls 的消息（通常是 AIMessage）
+        tc_msg = None
+        for m in reversed(state["messages"]):
+            tcs = getattr(m, "tool_calls", None)
+            if tcs:
+                tc_msg = m
+                break
+
+        if tc_msg is None:
+            # 没有 tool_calls，就不做任何事，避免 SystemMessage 报错
+            return {}
+
         outputs = []
-        for tc in last.tool_calls:
+        for tc in tc_msg.tool_calls:
             tool_fn = tools_by_name[tc["name"]]
             obs = tool_fn.invoke(tc["args"])
             outputs.append(ToolMessage(content=obs, tool_call_id=tc["id"]))
         return {"messages": outputs}
+
 
     # 5) Router
     def _extract_selected_skill(text: str) -> Optional[str]:
@@ -109,9 +123,20 @@ def create_skill_agent(
 
         return END
 
+    def select_skill_node(state: SkillAgentState):
+        last = state["messages"][-1]
+        skill = _extract_selected_skill(getattr(last, "content", ""))
+        if skill and (skill in runtimes):
+            return {"selected_skill": skill}
+        return {}
+
     # 6) Build graph (loop)
     g = StateGraph(SkillAgentState)
     g.add_node("llm_node", llm_node)
+    g.add_node("select_skill_node", select_skill_node)
+    g.add_edge("llm_node", "select_skill_node")
+    g.add_conditional_edges("select_skill_node", route, ["tool_node","skill_docs_node",END])
+
     g.add_node("skill_docs_node", skill_docs_node)
     g.add_node("tool_node", tool_node)
 

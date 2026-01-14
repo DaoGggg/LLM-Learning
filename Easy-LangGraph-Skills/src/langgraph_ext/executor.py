@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, Tuple
 
-from skill_manager import SkillManager
+from langgraph_ext.skill_manager import SkillManager
 
 class SkillExecutor:
     def __init__(self, skill_manager: SkillManager):

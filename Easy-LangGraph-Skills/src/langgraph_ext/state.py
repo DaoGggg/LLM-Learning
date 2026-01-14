@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import operator
+
+from langchain_core.messages import AnyMessage
 from typing_extensions import TypedDict, Annotated
-from langchain.messages import AnyMessage
+
 
 
 class SkillAgentState(TypedDict):

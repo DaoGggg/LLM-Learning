@@ -426,6 +426,7 @@ class SkillManager:
             return False, "", "Invalid command format"
 
         script_name = parts[1]
+        script_name = Path(script_name).name  # ✅ 自动兼容带路径的写法
         script_args = parts[2:] if len(parts) > 2 else []
 
         script_path = Path(script_name)
