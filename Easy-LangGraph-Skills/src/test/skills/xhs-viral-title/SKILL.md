@@ -21,6 +21,7 @@ description: 根据主题与人群画像，生成10-20个高点击的小红书�
 
 ## How to execute
 使用脚本生成标题：
+- 必须使用 Scripts 列表中的脚本名，禁止自行编造。
 
 ```bash
 python gen_xhs_titles.py --topic "通勤穿搭" --audience "上班族女生" --style "混合" --count 15 --keywords "显瘦,高级感,平价"
