@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph RAG Agent</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1>Graph RAG Agent</h1>
+                <span class="current-project" id="currentProjectIndicator">未选择项目</span>
+            </div>
+            <button class="btn-primary" onclick="showCreateProjectModal()">+ 新建项目</button>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Panel: Project & Document -->
+            <aside class="panel left-panel">
+                <div class="panel-tabs">
+                    <button class="tab-btn active" data-tab="projects" onclick="switchTab('projects')">项目空间</button>
+                    <button class="tab-btn" data-tab="upload" onclick="switchTab('upload')">文档上传</button>
+                </div>
+
+                <!-- Projects Tab -->
+                <div class="tab-content active" id="tab-projects">
+                    <div class="project-list" id="projectList">
+                        <div class="no-projects">点击上方按钮创建项目</div>
+                    </div>
+                </div>
+
+                <!-- Upload Tab -->
+                <div class="tab-content" id="tab-upload">
+                    <div class="upload-area" id="dropZone">
+                        <div class="upload-icon">📄</div>
+                        <p>拖拽文件到此处</p>
+                        <p class="upload-hint">或点击选择文件</p>
+                        <p class="file-types">支持 PDF、DOC、DOCX、TXT</p>
+                        <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt" hidden>
+                    </div>
+
+                    <div id="uploadProgress" class="upload-progress hidden">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p id="progressText">处理中...</p>
+                    </div>
+
+                    <div id="fileList" class="file-list"></div>
+
+                    <div class="graph-stats" id="graphStats">
+                        <h3>图谱统计</h3>
+                        <div class="stat-item">
+                            <span class="stat-label">实体数量</span>
+                            <span class="stat-value" id="entityCount">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">关系数量</span>
+                            <span class="stat-value" id="relationCount">0</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Center Panel: Chat -->
+            <main class="panel center-panel">
+                <div class="panel-header">
+                    <h2>对话</h2>
+                    <button id="clearChat" class="btn-text">清空对话</button>
+                </div>
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message bot">
+                        <div class="message-avatar">🤖</div>
+                        <div class="message-content">
+                            <p>你好！我是 Graph RAG Agent。</p>
+                            <p>请先选择或创建一个项目，然后上传文档构建知识图谱。</p>
+                            <p>我可以基于知识图谱回答问题，也可以进行日常闲聊。</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <textarea id="messageInput" placeholder="输入消息..." rows="1"></textarea>
+                    <button id="sendBtn" class="btn-primary">
+                        <span>发送</span>
+                    </button>
+                </div>
+            </main>
+
+            <!-- Right Panel: Graph Visualization -->
+            <aside class="panel right-panel">
+                <div class="panel-header">
+                    <h2>知识图谱</h2>
+                    <div class="graph-actions">
+                        <button id="toggleEditMode" class="btn-text">编辑模式</button>
+                        <button id="addNodeBtn" class="btn-text" style="display:none;">+ 添加节点</button>
+                        <button id="refreshGraph" class="btn-text">刷新</button>
+                    </div>
+                </div>
+                <div class="panel-content graph-container">
+                    <div id="graphChart" class="graph-chart"></div>
+
+                    <!-- Node Detail Panel -->
+                    <div id="nodeDetail" class="node-detail hidden">
+                        <h3>节点详情</h3>
+                        <div id="nodeContent"></div>
+                        <button id="closeNodeDetail" class="btn-text">关闭</button>
+                    </div>
+
+                    <!-- Edge Detail Panel -->
+                    <div id="edgeDetail" class="node-detail hidden">
+                        <h3>边详情</h3>
+                        <div id="edgeContent"></div>
+                        <div class="edge-actions">
+                            <button id="editEdgeBtn" class="btn-primary">编辑</button>
+                            <button id="deleteEdgeBtn" class="btn-danger">删除</button>
+                            <button id="closeEdgeDetail" class="btn-text" style="margin-left: 8px;">关闭</button>
+                        </div>
+                    </div>
+
+                    <!-- Edit Form -->
+                    <div id="editForm" class="node-detail hidden">
+                        <h3 id="editFormTitle">编辑节点</h3>
+                        <input type="hidden" id="editNodeId">
+                        <div class="form-group">
+                            <label>名称</label>
+                            <input type="text" id="editNodeName" placeholder="实体名称">
+                        </div>
+                        <div class="form-group">
+                            <label>类型</label>
+                            <input type="text" id="editNodeType" placeholder="如: PERSON, LOC, ORG">
+                        </div>
+                        <div class="form-group">
+                            <label>描述</label>
+                            <textarea id="editNodeDescription" rows="3" placeholder="实体描述"></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button id="saveEntityBtn" class="btn-primary">保存</button>
+                            <button id="closeEditForm" class="btn-text">取消</button>
+                        </div>
+                    </div>
+
+                    <!-- Edge Edit Form -->
+                    <div id="edgeEditForm" class="node-detail hidden">
+                        <h3 id="edgeEditFormTitle">编辑边</h3>
+                        <input type="hidden" id="editEdgeSource">
+                        <input type="hidden" id="editEdgeTarget">
+                        <div class="form-group">
+                            <label>源节点</label>
+                            <input type="text" id="editEdgeSourceName" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label>目标节点</label>
+                            <input type="text" id="editEdgeTargetName" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label>关系类型</label>
+                            <input type="text" id="editEdgeRelation" placeholder="如: 朋友, 属于, 位于">
+                        </div>
+                        <div class="form-group">
+                            <label>描述</label>
+                            <textarea id="editEdgeDescription" rows="2" placeholder="关系描述"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>原始原文</label>
+                            <div id="edgeSourceText" class="source-text-preview"></div>
+                        </div>
+                        <div class="form-actions">
+                            <button id="saveEdgeBtn" class="btn-primary">保存</button>
+                            <button id="closeEdgeEditForm" class="btn-text">取消</button>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Create Project Modal -->
+    <div id="createProjectModal" class="modal hidden">
+        <div class="modal-content">
+            <h3>新建项目</h3>
+            <div class="form-group">
+                <label>项目名称</label>
+                <input type="text" id="newProjectName" placeholder="输入项目名称">
+            </div>
+            <div class="form-group">
+                <label>项目描述（可选）</label>
+                <textarea id="newProjectDesc" rows="2" placeholder="输入项目描述"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-primary" onclick="createProject()">创建</button>
+                <button class="btn-text" onclick="closeCreateProjectModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/chat.js"></script>
+    <script src="js/graph.js"></script>
+    <script>
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tab === tabName);
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.toggle('active', content.id === 'tab-' + tabName);
+            });
+        }
+
+        // Create project modal
+        function showCreateProjectModal() {
+            document.getElementById('createProjectModal').classList.remove('hidden');
+            document.getElementById('newProjectName').focus();
+        }
+
+        function closeCreateProjectModal() {
+            document.getElementById('createProjectModal').classList.add('hidden');
+            document.getElementById('newProjectName').value = '';
+            document.getElementById('newProjectDesc').value = '';
+        }
+
+        async function createProject() {
+            const name = document.getElementById('newProjectName').value.trim();
+            const description = document.getElementById('newProjectDesc').value.trim();
+
+            if (!name) {
+                alert('请输入项目名称');
+                return;
+            }
+
+            try {
+                await window.projectManager.createProject(name, description);
+                closeCreateProjectModal();
+                switchTab('upload');
+            } catch (error) {
+                alert('创建失败: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
