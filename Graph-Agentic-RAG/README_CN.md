@@ -223,4 +223,5 @@ MIT License
 
 ## 贡献
 
+本项目只是一个小demo，仅供学习参考。
 欢迎提交 Issue 和 Pull Request！
