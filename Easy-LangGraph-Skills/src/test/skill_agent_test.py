@@ -12,7 +12,7 @@ from langchain_core.messages import HumanMessage
 llm = ChatOpenAI(
     model="qwen-plus",
     temperature=0.7,
-    api_key="",
+    api_key="sk-a31f2764bfd24c09bcd70f09f49a9c48",
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
 )
 
