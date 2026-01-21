@@ -357,7 +357,6 @@ python -m pytest tests/test_reflection_agent_with_minimax.py tests/test_tool_use
 
 ## 4.已实现Agent对比
 
-
 | 范式 | 核心能力 | 适用场景 | 复杂度 |
 |------|----------|----------|--------|
 | Reflection | 自我反思与修正 | 需要高质量回答的任务 | ⭐⭐ |
