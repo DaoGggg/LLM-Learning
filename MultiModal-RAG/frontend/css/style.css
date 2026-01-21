@@ -1,0 +1,277 @@
+/*
+ * PDF 结构解析器 - 自定义样式
+ * MultiModal RAG Demo 1
+ */
+
+/* =======================
+   基础样式
+   ======================= */
+body {
+    background-color: #f8f9fa;
+    min-height: 100vh;
+}
+
+.container-fluid {
+    max-width: 1600px;
+}
+
+/* =======================
+   拖拽上传区域
+   ======================= */
+.drop-zone {
+    border: 2px dashed #ced4da;
+    border-radius: 8px;
+    padding: 40px 20px;
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.drop-zone:hover,
+.drop-zone.dragover {
+    border-color: #0d6efd;
+    background-color: #e9f2ff;
+}
+
+.drop-zone p {
+    color: #6c757d;
+    margin-bottom: 15px;
+}
+
+/* =======================
+   PDF 查看器
+   ======================= */
+.pdf-viewer {
+    background-color: #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    overflow: auto;
+}
+
+#imageContainer {
+    position: relative;
+    display: inline-block;
+}
+
+#pdfImage {
+    max-width: 100%;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* =======================
+   标注层（SVG）
+   ======================= */
+.annotation-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.element-box {
+    position: absolute;
+    border: 2px solid;
+    border-radius: 3px;
+    cursor: pointer;
+    pointer-events: all;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+}
+
+.element-box:hover {
+    opacity: 1;
+    transform: scale(1.02);
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+.element-box.active {
+    opacity: 1;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.8), 0 0 15px rgba(0,0,0,0.5);
+    z-index: 100;
+}
+
+/* 元素类型边框颜色 */
+.element-box[data-type="Title"] {
+    border-color: #FF6B6B;
+    background-color: rgba(255, 107, 107, 0.15);
+}
+
+.element-box[data-type="NarrativeText"] {
+    border-color: #4ECDC4;
+    background-color: rgba(78, 205, 196, 0.15);
+}
+
+.element-box[data-type="BulletedText"],
+.element-box[data-type="ListItem"] {
+    border-color: #FFEAA7;
+    background-color: rgba(255, 234, 167, 0.2);
+}
+
+.element-box[data-type="Table"] {
+    border-color: #45B7D1;
+    background-color: rgba(69, 183, 209, 0.15);
+}
+
+.element-box[data-type="Image"] {
+    border-color: #96CEB4;
+    background-color: rgba(150, 206, 180, 0.15);
+}
+
+.element-box[data-type="Formula"] {
+    border-color: #DDA0DD;
+    background-color: rgba(221, 160, 221, 0.2);
+}
+
+/* =======================
+   图例样式
+   ======================= */
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    padding: 4px 0;
+}
+
+.legend-color {
+    width: 20px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+/* =======================
+   元素详情面板
+   ======================= */
+.element-detail {
+    position: fixed;
+    top: 100px;
+    right: 30px;
+    width: 350px;
+    z-index: 1000;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.element-detail .card {
+    border: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.element-detail pre {
+    max-height: 200px;
+    overflow: auto;
+    font-size: 0.85rem;
+}
+
+/* Badge 颜色 */
+.badge[data-type="Title"] {
+    background-color: #FF6B6B;
+}
+
+.badge[data-type="NarrativeText"] {
+    background-color: #4ECDC4;
+}
+
+.badge[data-type="BulletedText"],
+.badge[data-type="ListItem"] {
+    background-color: #FFC107;
+    color: #000;
+}
+
+.badge[data-type="Table"] {
+    background-color: #45B7D1;
+}
+
+.badge[data-type="Image"] {
+    background-color: #96CEB4;
+    color: #000;
+}
+
+.badge[data-type="Formula"] {
+    background-color: #DDA0DD;
+}
+
+/* =======================
+   进度条样式
+   ======================= */
+.progress {
+    height: 25px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    font-weight: bold;
+    line-height: 25px;
+}
+
+/* =======================
+   响应式设计
+   ======================= */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding: 0 15px;
+    }
+
+    .col-md-4, .col-md-8 {
+        margin-bottom: 20px;
+    }
+
+    .element-detail {
+        position: fixed;
+        top: auto;
+        bottom: 0;
+        right: 0;
+        left: 0;
+        width: 100%;
+        border-radius: 0;
+    }
+
+    .btn-group {
+        flex-wrap: wrap;
+    }
+}
+
+/* =======================
+   工具类
+   ======================= */
+.card {
+    border: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    font-weight: 500;
+}
+
+/* 加载动画 */
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(0,0,0,0.1);
+    border-radius: 50%;
+    border-top-color: #0d6efd;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* 禁用状态 */
+button:disabled {
+    cursor: not-allowed !important;
+}
+
+/* Toast 样式 */
+.toast-container {
+    z-index: 9999;
+}
