@@ -307,13 +307,13 @@ class MiniMaxClient(LLMClientBase):
 
     参数:
         api_key: MiniMax API密钥
-        model: 使用的模型名称（默认: MiniMax-M2）
+        model: 使用的模型名称（默认: abab6.5s-chat）
     """
 
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "MiniMax-M2"
+        model: str = "abab6.5s-chat"
     ):
         self.api_key = api_key or os.getenv("MINIMAX_API_KEY")
         self.model = model
@@ -345,8 +345,9 @@ class MiniMaxClient(LLMClientBase):
         }
 
         # 可选参数
-        if request.temperature is not None:
-            data["temperature"] = request.temperature
+        # MiniMax API 可能不支持 temperature 参数，需要检查
+        # if request.temperature is not None:
+        #     data["temperature"] = request.temperature
 
         try:
             response = requests.post(url, headers=headers, json=data, timeout=60)
@@ -404,7 +405,7 @@ def create_llm_client(provider: str = "openai", **kwargs) -> LLMClientBase:
     # MiniMax 特殊处理：使用专门的 MiniMax 客户端
     if provider == "minimax":
         api_key = kwargs.pop("api_key", None) or os.environ.get("MINIMAX_API_KEY")
-        model = kwargs.pop("model", "MiniMax-M2")
+        model = kwargs.pop("model", "abab6.5s-chat")
         return MiniMaxClient(api_key=api_key, model=model)
 
     if provider not in providers:
