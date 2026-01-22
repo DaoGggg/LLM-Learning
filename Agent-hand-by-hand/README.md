@@ -333,7 +333,262 @@ ReAct (Reasoning + Acting) 是 Tool Use 的增强模式，强调推理过程：
 
 ---
 
-## 3.运行测试
+## 3.Planning
+
+规划是Agent AI 的一个关键设计模式，使用大型语言模型自主决定执行哪些步骤来完成更大的任务。例如，如果我们要求Agent对给定主题进行在线研究，我们可能会使用 LLM 将目标分解为较小的子任务，例如研究特定子主题、综合研究结果和编写报告。
+
+### 3.1 实现流程
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Planning Agent 流程                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   ┌──────────┐    ┌──────────┐    ┌──────────┐                  │
+│   │ 用户输入  │───>│ LLM分解  │───>│ 拓扑排序  │                  │
+│   │ 复杂任务  │    │ 子任务   │    │ 确定顺序  │                  │
+│   └──────────┘    └──────────┘    └────┬─────┘                  │
+│                                         │                        │
+│                                         ▼                        │
+│   ┌──────────┐    ┌──────────┐    ┌──────────┐                  │
+│   │ 综合结果 <───│  │汇总整合  │<───│ 依次执行  │                  │
+│   │ 最终响应  │    │          │    │ 子任务   │                  │
+│   └──────────┘    └──────────┘    └──────────┘                  │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 3.2 核心代码结构
+
+```python
+class SubTask:
+    """子任务类 - 表示一个分解后的子任务"""
+    def __init__(self, id: str, description: str, dependent_on: List[str] = None):
+        self.id = id                      # 子任务ID
+        self.description = description    # 子任务描述
+        self.status = "pending"           # 执行状态
+        self.result = None                # 执行结果
+        self.dependent_on = dependent_on  # 依赖的其他子任务ID
+
+class PlanningAgent(AgentBase):
+    """规划Agent - 能够自主规划和执行多步骤任务的智能代理"""
+
+    def run(self, user_input: str) -> dict:
+        """
+        核心逻辑：
+        1. 任务分解 - 使用LLM将大任务分解为子任务
+        2. 确定顺序 - 拓扑排序确定执行顺序
+        3. 执行子任务 - 依次执行每个子任务
+        4. 综合结果 - 汇总所有子任务结果生成最终响应
+        """
+        # Step 1: 任务分解
+        self.subtasks = []
+        subtask_dicts = self._decompose_task(user_input)
+
+        # Step 2: 确定执行顺序（拓扑排序）
+        self.task_plan = self._build_execution_order()
+
+        # Step 3: 依次执行子任务
+        for task in self.task_plan:
+            result = self._execute_subtask(task)
+            task.result = result
+            task.status = "completed"
+
+        # Step 4: 综合结果
+        final_response = self._synthesize_results(user_input)
+
+        return {
+            "response": final_response,
+            "task_plan": [...],
+            "subtask_results": [...],
+            "num_subtasks": len(self.task_plan)
+        }
+```
+
+### 3.3 任务分解Prompt
+
+```python
+decompose_prompt = f"""请将以下任务分解为多个具体的子任务：
+
+用户任务：{user_input}
+
+请将任务分解为3-7个子任务，并按照执行顺序编号。
+对于每个子任务，说明：
+1. 任务内容（做什么）
+2. 预期产出（得到什么）
+
+请用JSON数组格式返回：
+[
+    {{"id": "1", "description": "研究AI发展历史", "dependent_on": []}},
+    {{"id": "2", "description": "分析当前技术趋势", "dependent_on": ["1"]}},
+    {{"id": "3", "description": "总结未来发展方向", "dependent_on": ["1", "2"]}}
+]
+
+只返回JSON，不要有其他内容。"""
+```
+
+### 3.4 HierarchicalPlannerAgent (层级规划)
+
+支持多层级任务分解的增强版本：
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  HierarchicalPlannerAgent 流程                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐ │
+│   │ 用户输入  │───>│ 层级分解  │───>│ 执行叶子  │───>│ 生成报告  │ │
+│   │          │    │ (最多3层) │    │ 节点任务  │    │          │ │
+│   └──────────┘    └──────────┘    └──────────┘    └──────────┘ │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 3.5 相关文件
+
+| 文件 | 说明 |
+|------|------|
+| `agents/planning_agent.py` | PlanningAgent 和 HierarchicalPlannerAgent 实现 |
+| `tests/test_planning_agent.py` | 模拟测试（快速验证） |
+| `tests/test_planning_agent_with_minimax.py` | MiniMax API 集成测试 |
+
+---
+
+## 4.Multi-agent collaboration
+
+多智能体协作是四种关键人工智能智能体设计模式中的最后一种。对于编写软件这样的复杂任务，多智能体方法会将任务分解为由不同角色（例如软件工程师、产品经理、设计师、QA（质量保证）工程师等）执行的子任务，并让不同的智能体完成不同的子任务。
+
+### 4.1 实现流程
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  Multi-agent Collaboration 流程                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   ┌──────────┐    ┌──────────┐    ┌──────────┐                  │
+│   │ 用户输入  │───>│ 任务分配  │───>│ 执行角色  │                  │
+│   │ 复杂任务  │    │ (LLM决策)│    │   任务   │                  │
+│   └──────────┘    └──────────┘    └────┬─────┘                  │
+│                                         │                        │
+│                    ┌────────────────────┼────────────────────┐   │
+│                    │                    │                    │   │
+│                    ▼                    ▼                    ▼   │
+│             顺序执行模式           并行执行模式           角色Agent │
+│                    │                    │                    │   │
+│                    └────────────────────┴────────────────────┘   │
+│                                         │                        │
+│                                         ▼                        │
+│                                   ┌──────────┐                   │
+│                                   │ 汇总整合  │                   │
+│                                   │ 生成报告  │                   │
+│                                   └──────────┘                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 4.2 核心代码结构
+
+```python
+@dataclass
+class AgentRole:
+    """Agent角色定义"""
+    name: str                    # 角色名称
+    description: str             # 角色描述
+    system_prompt: str           # 系统提示词
+    expertise: List[str]         # 专业领域
+
+class RoleAgent:
+    """角色Agent - 代表特定角色的轻量级Agent"""
+    def execute(self, task: str) -> str:
+        """执行角色任务"""
+        user_message = f"请作为{self.role.name}执行以下任务：\n\n{task}"
+        self.history.append(Message(role="user", content=user_message))
+        response = self._call_llm(self.history)
+        self.history.append(Message(role="assistant", content=response))
+        return response
+
+class MultiAgentCoordinator(AgentBase):
+    """多智能体协调器 - 管理多个角色Agent的协调工作"""
+
+    def run(self, user_input: str) -> dict:
+        """
+        核心逻辑：
+        1. 任务分配 - LLM分析任务并分配给合适的角色
+        2. 执行角色任务 - 顺序或并行执行
+        3. 汇总整合 - 综合各角色结果生成最终响应
+        """
+        # Step 1: 分配任务给各角色
+        task_distribution = self._distribute_tasks(user_input)
+
+        # Step 2: 执行各角色任务
+        if self.execution_mode == "parallel":
+            self.execution_results = self._execute_parallel(task_distribution)
+        else:
+            self.execution_results = self._execute_sequential(task_distribution)
+
+        # Step 3: 综合结果
+        final_response = self._synthesize_results(user_input, task_distribution)
+
+        return {
+            "response": final_response,
+            "role_results": self.execution_results,
+            "task_distribution": task_distribution,
+            "roles_executed": list(self.execution_results.keys())
+        }
+```
+
+### 4.3 预设角色定义
+
+```python
+# 软件开发团队角色
+def create_software_dev_roles() -> List[AgentRole]:
+    return [
+        AgentRole(
+            name="产品经理",
+            description="分析需求，制定产品方案",
+            system_prompt="你是资深产品经理，擅长深入理解用户需求，将需求转化为具体的产品功能...",
+            expertise=["需求分析", "产品规划", "用户研究"]
+        ),
+        AgentRole(
+            name="架构师",
+            description="设计系统架构和技术方案",
+            system_prompt="你是资深系统架构师，擅长设计高可用、可扩展的系统架构...",
+            expertise=["系统设计", "技术选型", "性能优化"]
+        ),
+        AgentRole(
+            name="程序员",
+            description="编写高质量代码",
+            system_prompt="你是资深程序员，擅长编写清晰、可维护的代码...",
+            expertise=["代码编写", "测试", "调试"]
+        ),
+        AgentRole(
+            name="测试工程师",
+            description="确保产品质量",
+            system_prompt="你是资深测试工程师，擅长设计全面的测试用例...",
+            expertise=["测试设计", "缺陷分析", "质量评估"]
+        )
+    ]
+
+# 会议讨论团队角色
+def create_discussion_roles() -> List[AgentRole]:
+    return [
+        AgentRole(name="主持人", description="引导讨论，确保流程", ...),
+        AgentRole(name="技术专家", description="提供技术见解", ...),
+        AgentRole(name="业务专家", description="提供业务视角", ...),
+        AgentRole(name="记录员", description="记录会议要点", ...)
+    ]
+```
+
+### 4.4 相关文件
+
+| 文件 | 说明 |
+|------|------|
+| `agents/multi_agent.py` | MultiAgentCoordinator、RoleAgent、AgentRole 实现 |
+| `tests/test_multi_agent.py` | 模拟测试（快速验证） |
+| `tests/test_multi_agent_with_minimax.py` | MiniMax API 集成测试 |
+
+---
+
+## 5.运行测试
 
 ### 所有测试
 ```bash
@@ -343,19 +598,19 @@ python -m pytest tests/ -v
 
 ### 仅模拟测试（快速验证）
 ```bash
-python -m pytest tests/test_reflection_agent.py tests/test_tool_use_agent.py -v
+python -m pytest tests/test_reflection_agent.py tests/test_tool_use_agent.py tests/test_planning_agent.py tests/test_multi_agent.py -v
 ```
 
 ### MiniMax API 测试
 ```bash
 # 需要设置环境变量
 set MINIMAX_API_KEY=your-api-key
-python -m pytest tests/test_reflection_agent_with_minimax.py tests/test_tool_use_agent_with_minimax.py -v
+python -m pytest tests/test_reflection_agent_with_minimax.py tests/test_tool_use_agent_with_minimax.py tests/test_planning_agent_with_minimax.py tests/test_multi_agent_with_minimax.py -v
 ```
 
 ---
 
-## 4.已实现Agent对比
+## 6.已实现Agent对比
 
 
 | 范式 | 核心能力 | 适用场景 | 复杂度 |
@@ -363,10 +618,12 @@ python -m pytest tests/test_reflection_agent_with_minimax.py tests/test_tool_use
 | Reflection | 自我反思与修正 | 需要高质量回答的任务 | ⭐⭐ |
 | Tool Use | 外部工具调用 | 需要计算、搜索等能力的任务 | ⭐⭐ |
 | ReAct | 推理+行动 | 复杂多步骤任务 | ⭐⭐⭐ |
+| Planning | 任务分解与规划 | 复杂多步骤任务 | ⭐⭐⭐ |
+| Multi-agent | 多角色协作 | 团队协作式复杂任务 | ⭐⭐⭐⭐ |
 
 ---
 
-## 5.扩展新的Agent范式
+## 7.扩展新的Agent范式
 
 每个Agent范式需要包含：
 

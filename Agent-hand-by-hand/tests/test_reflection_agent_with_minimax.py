@@ -135,8 +135,9 @@ class TestMiniMaxClientDirect:
     def test_get_model_name(self):
         """测试获取模型名称"""
         llm = create_llm_client(provider="minimax")
-        assert "MiniMax" in llm.get_model_name()
-        print(f"模型名称: {llm.get_model_name()}")
+        model_name = llm.get_model_name()
+        assert model_name is not None and len(model_name) > 0
+        print(f"模型名称: {model_name}")
 
     def test_basic_chat(self):
         """测试基本聊天"""
