@@ -240,8 +240,13 @@
         // 开始 SSE 监听进度
         startProgressListener();
 
+        // 使用 MinerU 解析
+        const apiEndpoint = `/api/pdf/parse/${state.taskId}`;
+
+        showToast('info', '使用 MinerU 解析引擎', '开始解析...');
+
         // 发送解析请求
-        fetch(API_BASE + '/api/pdf/parse/all/' + state.taskId, {
+        fetch(API_BASE + apiEndpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -268,35 +273,42 @@
     // SSE 进度监听
     // =======================
     let eventSource = null;
+    let pollInterval = null;
 
     function startProgressListener() {
+        // 关闭现有的 SSE 或轮询
         if (eventSource) {
             eventSource.close();
+            eventSource = null;
+        }
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
         }
 
-        eventSource = new EventSource(API_BASE + '/api/pdf/progress/' + state.taskId);
+        // 使用轮询方式（比 SSE 更可靠，避免长连接超时问题）
+        pollInterval = setInterval(async () => {
+            try {
+                const response = await fetch(API_BASE + '/api/pdf/progress/poll/' + state.taskId);
+                if (response.ok) {
+                    const data = await response.json();
+                    updateProgress(data);
 
-        eventSource.addEventListener('progress', (e) => {
-            const data = JSON.parse(e.data);
-            updateProgress(data);
-        });
-
-        eventSource.addEventListener('result', (e) => {
-            const result = JSON.parse(e.data);
-            handleParseComplete(result);
-        });
-
-        eventSource.addEventListener('error', (e) => {
-            const data = JSON.parse(e.data);
-            showToast('error', '错误', data.error || '连接失败');
-        });
-
-        // 超时关闭
-        setTimeout(() => {
-            if (eventSource && eventSource.readyState === EventSource.OPEN) {
-                eventSource.close();
+                    // 如果完成，处理结果
+                    if (data.status === 'completed' && data.result) {
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                        handleParseComplete(data);
+                    } else if (data.status === 'failed') {
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                        showToast('error', '错误', data.message || '解析失败');
+                    }
+                }
+            } catch (error) {
+                console.error('轮询进度失败:', error);
             }
-        }, 300000); // 5 分钟超时
+        }, 500); // 每 500ms 轮询一次
     }
 
     function updateProgress(data) {
@@ -320,17 +332,21 @@
     function handleParseComplete(result) {
         state.parseResult = result.result;
         state.elements = result.result.pages;
+        state.totalPages = result.result.pages.length;
 
-        // 停止 SSE
-        if (eventSource) {
-            eventSource.close();
-            eventSource = null;
+        // 停止轮询
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
         }
 
         showToast('success', '解析完成', '共 ' + state.totalPages + ' 页');
 
         // 启用查看结果按钮
         elements.viewResultBtn.disabled = false;
+
+        // 重置为第一页（避免显示最后一页）
+        state.currentPage = 1;
 
         // 自动显示结果
         elements.viewResultBtn.click();
@@ -384,6 +400,21 @@
                 // 图片加载完成后绘制标注框
                 drawAnnotations(pageData.elements);
             };
+
+            // 点击图片显示坐标（调试用）
+            elements.pdfImage.onclick = (e) => {
+                const rect = e.target.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const naturalWidth = elements.pdfImage.naturalWidth;
+                const naturalHeight = elements.pdfImage.naturalHeight;
+                const naturalX = Math.round(x * (naturalWidth / rect.width));
+                const naturalY = Math.round(y * (naturalHeight / rect.height));
+                console.log(`[CLICK] 像素: (${Math.round(x)}, ${Math.round(y)}) / 自然: (${naturalX}, ${naturalY})`);
+                console.log(`  百分比: X=${(naturalX/naturalWidth*100).toFixed(1)}%, Y=${(naturalY/naturalHeight*100).toFixed(1)}%`);
+                console.log(`  图片尺寸: ${Math.round(rect.width)}x${Math.round(rect.height)}`);
+                console.log(`  自然尺寸: ${naturalWidth}x${naturalHeight}`);
+            };
         } else {
             showToast('warning', '警告', '页面图片生成失败');
         }
@@ -397,31 +428,44 @@
     }
 
     // =======================
-    // 绘制标注框
+    // 绘制标注框（使用 SVG 原生元素）
     // =======================
-    function drawAnnotations(elements) {
+    function drawAnnotations(pageElements) {
         const svg = elements.annotationLayer;
         const img = elements.pdfImage;
+        const imageContainer = document.getElementById('imageContainer');
 
         // 清空现有标注
         svg.innerHTML = '';
 
-        // 获取图片尺寸
-        const imgRect = img.getBoundingClientRect();
-        const displayWidth = imgRect.width;
-        const displayHeight = imgRect.height;
+        // 获取图片的自然尺寸和显示尺寸
+        const naturalWidth = img.naturalWidth;
+        const naturalHeight = img.naturalHeight;
 
-        // 设置 SVG 尺寸
+        // 使用 offsetWidth/offsetHeight 获取显示尺寸
+        const displayWidth = img.offsetWidth;
+        const displayHeight = img.offsetHeight;
+
+        // 计算缩放比例
+        const scaleX = displayWidth / naturalWidth;
+        const scaleY = displayHeight / naturalHeight;
+
+        // 设置 SVG viewBox 以匹配显示尺寸
+        svg.setAttribute('viewBox', `0 0 ${displayWidth} ${displayHeight}`);
         svg.style.width = displayWidth + 'px';
         svg.style.height = displayHeight + 'px';
 
-        // 计算缩放比例
-        const scaleX = displayWidth / img.naturalWidth;
-        const scaleY = displayHeight / img.naturalHeight;
+        console.log('\n========== 绘制标注框调试 ==========');
+        console.log(`[IMG] natural: ${naturalWidth}x${naturalHeight}`);
+        console.log(`[IMG] display: ${displayWidth}x${displayHeight}`);
+        console.log(`[SCALE] X=${scaleX.toFixed(4)}, Y=${scaleY.toFixed(4)}`);
+        console.log(`[SVG] viewBox: 0 0 ${displayWidth} ${displayHeight}`);
+        console.log('===================================\n');
 
         // 绘制每个元素的边框
-        elements.forEach((element, index) => {
+        pageElements.forEach((element, index) => {
             if (!element.coordinates || !element.coordinates.points) return;
+            if (element.content && element.content.startsWith('[页面')) return;
 
             const points = element.coordinates.points;
             if (!points || points.length < 4) return;
@@ -429,7 +473,6 @@
             // 计算边界框
             let minX = Infinity, minY = Infinity;
             let maxX = -Infinity, maxY = -Infinity;
-
             points.forEach(point => {
                 minX = Math.min(minX, point[0]);
                 minY = Math.min(minY, point[1]);
@@ -437,44 +480,103 @@
                 maxY = Math.max(maxY, point[1]);
             });
 
-            // 创建边框元素
-            const box = document.createElement('div');
-            box.className = 'element-box';
-            box.dataset.type = element.type;
-            box.dataset.index = index;
-            box.dataset.content = element.content.substring(0, 200);
-            box.dataset.page = element.page;
+            // 计算 SVG 坐标（直接使用缩放后的值）
+            const x = Math.round(minX * scaleX);
+            const y = Math.round(minY * scaleY);
+            const width = Math.max(Math.round((maxX - minX) * scaleX), 20);
+            const height = Math.max(Math.round((maxY - minY) * scaleY), 15);
 
-            // 设置位置和尺寸
-            const left = minX * scaleX;
-            const top = minY * scaleY;
-            const width = (maxX - minX) * scaleX;
-            const height = (maxY - minY) * scaleY;
+            // 获取元素类型的颜色
+            const typeColor = element.color || getElementColor(element.type);
 
-            box.style.left = left + 'px';
-            box.style.top = top + 'px';
-            box.style.width = Math.max(width, 20) + 'px';
-            box.style.height = Math.max(height, 15) + 'px';
+            // 创建 SVG group 元素
+            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            group.setAttribute('class', 'element-group');
+            group.style.cursor = 'pointer';
+            group.style.pointerEvents = 'all';
+            group.style.opacity = '0.6';
+            group.style.transition = 'opacity 0.2s ease';
+            group.dataset.rawX = minX;
+            group.dataset.rawY = minY;
+            group.dataset.content = element.content;
 
-            // 悬停显示详情
-            box.addEventListener('mouseenter', () => showElementDetail(element, box));
-            box.addEventListener('mouseleave', () => hideElementDetail());
-            box.addEventListener('click', () => showElementDetail(element, box));
+            // 悬停效果
+            group.addEventListener('mouseenter', () => {
+                group.style.opacity = '1';
+                showElementDetail(element, group);
+            });
+            group.addEventListener('mouseleave', () => {
+                group.style.opacity = '0.6';
+                hideElementDetail();
+            });
+            group.addEventListener('click', () => {
+                showElementDetail(element, group);
+            });
 
-            // 注入到容器中
-            document.getElementById('imageContainer').appendChild(box);
+            // 创建矩形框
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x', x);
+            rect.setAttribute('y', y);
+            rect.setAttribute('width', width);
+            rect.setAttribute('height', height);
+            rect.setAttribute('fill', typeColor + '20');  // 添加透明度
+            rect.setAttribute('stroke', typeColor);
+            rect.setAttribute('stroke-width', '2');
+            rect.setAttribute('rx', '3');
+
+            group.appendChild(rect);
+            svg.appendChild(group);
+
+            // 打印前3个元素的调试信息
+            if (index < 3) {
+                console.log(`[ELEMENT ${index}] ${element.type}: "${element.content.substring(0, 30)}..."`);
+                console.log(`  原始坐标: X=[${minX},${maxX}], Y=[${minY},${maxY}]`);
+                console.log(`  百分比: X=${(minX/naturalWidth*100).toFixed(1)}%, Y=${(minY/naturalHeight*100).toFixed(1)}%`);
+                console.log(`  SVG 坐标: x=${x}, y=${y}, w=${width}, h=${height}`);
+            }
         });
+
+        // 延迟验证 SVG rect 的实际渲染位置
+        setTimeout(() => {
+            const svgRects = svg.querySelectorAll('rect');
+            const imgRect = img.getBoundingClientRect();
+            console.log('\n========== 实际渲染验证 ==========');
+            console.log(`[IMG] 视口: left=${imgRect.left.toFixed(1)}, top=${imgRect.top.toFixed(1)}, w=${imgRect.width.toFixed(1)}, h=${imgRect.height.toFixed(1)}`);
+            svgRects.forEach((rect, i) => {
+                if (i >= 3) return;
+                const box = rect.getBoundingClientRect();
+                console.log(`[RECT ${i}] 视口: left=${box.left.toFixed(1)}, top=${box.top.toFixed(1)}, w=${box.width.toFixed(1)}, h=${box.height.toFixed(1)}`);
+            });
+            console.log('==================================\n');
+        }, 200);
+    }
+
+    // 获取元素类型的颜色
+    function getElementColor(type) {
+        const colors = {
+            'Title': '#FF6B6B',
+            'NarrativeText': '#4ECDC4',
+            'BulletedText': '#FFEAA7',
+            'ListItem': '#FFEAA7',
+            'Table': '#45B7D1',
+            'Image': '#96CEB4',
+            'Formula': '#DDA0DD'
+        };
+        return colors[type] || '#888888';
     }
 
     // =======================
     // 元素详情
     // =======================
     let currentElementContent = '';
+    let activeGroup = null;
 
-    function showElementDetail(element, box) {
-        // 高亮边框
-        document.querySelectorAll('.element-box').forEach(b => b.classList.remove('active'));
-        box.classList.add('active');
+    function showElementDetail(element, group) {
+        // 高亮边框（SVG group）
+        hideElementDetail();
+        activeGroup = group;
+        group.style.opacity = '1';
+        group.style.filter = 'drop-shadow(0 0 5px rgba(0,0,0,0.5))';
 
         // 更新详情面板
         elements.detailType.textContent = element.type;
@@ -488,13 +590,18 @@
     }
 
     function hideElementDetail() {
-        document.querySelectorAll('.element-box').forEach(b => b.classList.remove('active'));
+        // 移除所有 group 的高亮
+        document.querySelectorAll('.element-group').forEach(g => {
+            g.style.opacity = '0.6';
+            g.style.filter = '';
+        });
     }
 
-    function closeElementDetail() {
+    // 暴露为全局函数（供 HTML onclick 调用）
+    window.closeElementDetail = function() {
         elements.elementDetail.style.display = 'none';
         hideElementDetail();
-    }
+    };
 
     function copyElementContent() {
         navigator.clipboard.writeText(currentElementContent)

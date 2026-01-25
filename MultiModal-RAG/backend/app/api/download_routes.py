@@ -62,9 +62,30 @@ def generate_markdown(pages_data: list, pdf_info: dict, task_id: str) -> str:
             elif elem_type == "ListItem":
                 lines.append(f"1. {content}\n")
             elif elem_type == "Table":
-                lines.append(f"**Table:** {content}\n")
+                # 表格处理：表格内容已经是 Markdown 格式
+                if content.startswith('|'):
+                    # Markdown 表格格式
+                    lines.append(f"**表格 (Page {page_num})**\n")
+                    lines.append(f"{content}\n")
+                elif content.startswith('images/') or content.startswith('[表格图片:'):
+                    # 图片路径格式（向后兼容）
+                    if content.startswith('[表格图片:'):
+                        img_path = content.replace('[表格图片: ', '').rstrip(']')
+                    else:
+                        img_path = content
+                    img_filename = img_path.split('/')[-1] if '/' in img_path else img_path
+                    lines.append(f"**表格 (Page {page_num})**\n")
+                    lines.append(f"![表格图片](/static/images/pdf_pages/{img_filename})\n")
+                else:
+                    # 纯文本内容
+                    lines.append(f"**Table:** {content}\n")
             elif elem_type == "Image":
-                lines.append(f"**Image:** {content}\n")
+                # 图片内容已经是 markdown 图片语法，直接输出
+                if content.startswith('images/'):
+                    img_filename = content.split('/')[-1] if '/' in content else content
+                    lines.append(f"![图片](/static/images/pdf_pages/{img_filename})\n")
+                else:
+                    lines.append(f"{content}\n")
             elif elem_type == "Formula":
                 lines.append(f"`{content}`\n")
             else:

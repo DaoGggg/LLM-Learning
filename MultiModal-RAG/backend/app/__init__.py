@@ -83,6 +83,11 @@ def create_app(config_name: str = "default") -> Flask:
     def serve_lib(filename):
         return send_from_directory(str(BASE_DIR / "frontend" / "lib"), filename)
 
+    # 提供解析出的图片文件
+    @app.route("/outputs/images/<path:filename>")
+    def serve_image(filename):
+        return send_from_directory(str(BASE_DIR / "outputs" / "images"), filename)
+
     return app
 
 

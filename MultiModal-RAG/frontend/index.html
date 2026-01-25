@@ -56,6 +56,9 @@
                         <button id="uploadBtn" class="btn btn-success w-100 mt-3" disabled>
                             <i class="bi bi-upload"></i> 开始上传并解析
                         </button>
+                        <div class="mt-2">
+                            <small class="text-muted">解析引擎：MinerU</small>
+                        </div>
                     </div>
                 </div>
 
@@ -104,7 +107,7 @@
                             <div class="col-6">
                                 <div class="legend-item">
                                     <span class="legend-color" style="background-color: #FFEAA7;"></span>
-                                    <span>ListItem (列表)</span>
+                                    <span>BulletedText (列表项)</span>
                                 </div>
                             </div>
                             <div class="col-6">
@@ -150,7 +153,7 @@
                     <div class="card-body">
                         <!-- PDF 页面可视化展示 -->
                         <div id="pdfViewer" class="pdf-viewer mb-4">
-                            <div class="position-relative" id="imageContainer">
+                            <div id="imageContainer" style="display: inline-block; position: relative; line-height: 0;">
                                 <img id="pdfImage" src="" alt="PDF Page" class="img-fluid">
                                 <svg id="annotationLayer" class="annotation-layer"></svg>
                             </div>

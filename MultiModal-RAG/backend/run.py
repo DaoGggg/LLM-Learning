@@ -16,7 +16,7 @@ if __name__ == "__main__":
     print("=" * 50)
     print("PDF Parser API 启动中...")
     print("=" * 50)
-    print(f"访问地址: http://localhost:5000")
+    print(f"访问地址: http://localhost:5001")
     print(f"API 端点:")
     print(f"  - POST /api/pdf/upload          : 上传 PDF")
     print(f"  - GET  /api/pdf/info/<task_id>  : 获取 PDF 信息")
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     # 启动服务器
     app.run(
         host="0.0.0.0",
-        port=5000,
+        port=5001,
         debug=True,
         threaded=True
     )
