@@ -84,6 +84,7 @@ Python，javascript，html，css
 │                    MinerU (mineru-env)                        │
 │  - hybrid-auto-engine 后端                                   │
 │  - 表格检测 + OCR                                            │
+│  - 公式检测（LaTeX 格式）                                    │
 │  - 输出 middle.json + Markdown                               │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -108,11 +109,15 @@ Python，javascript，html，css
 MinerU 使用 PDF 坐标系（原点左下角，单位为 points），需要转换为浏览器像素坐标系（原点左上角）：
 
 ```python
-# 计算缩放因子
-scale_x = img_width / 595   # A4 页面宽度 595 points
-scale_y = img_height / 842  # A4 页面高度 842 points
+# 从 middle.json 获取页面尺寸
+page_width = page_data.get('width', 595)      # 默认 A4 宽度
+page_height = page_data.get('height', 842)    # 默认 A4 高度
 
-# 应用缩放
+# 计算缩放因子
+scale_x = img_width / page_width
+scale_y = img_height / page_height
+
+# 应用缩放（直接缩放，MinerU 坐标系与浏览器兼容）
 x0_scaled = int(x0 * scale_x)
 y0_scaled = int(y0 * scale_y)
 x1_scaled = int(x1 * scale_x)
@@ -156,7 +161,7 @@ MinerU 对表格的处理方式：
 解析上传的PDF文件，并返回解析结果，包含PDF文件结构信息（如页数、页码、标题、段落、表格、图片、流程图等）以及每页的元素信息（如元素类型、位置、内容等）。
 
 **后端：**
-使用 `MinerU` 库解析上传的PDF文件，表格内容通过 `pdfplumber` 增强提取。解析结果通过接口方式，根据请求页展示对应页面解析内容（SVG 标注层）。
+使用 `MinerU` 库解析上传的PDF文件，直接通过官方 Python API 调用。解析结果通过接口方式，根据请求页展示对应页面解析内容（SVG 标注层）。
 
 **前端：**
 - 提供PDF上传界面，支持实时查看解析进度。
@@ -165,7 +170,7 @@ MinerU 对表格的处理方式：
 - 可视化界面可及时查看解析情况。
 
 **使用流程：**
-1. 用户上传PDF文件，选择解析引擎（推荐 MinerU），点击"开始解析"。
+1. 用户上传PDF文件，点击"开始上传并解析"。
 2. 后台开始解析，并实时向前端返回解析进度。
 3. 解析完成后，前端提示"解析完成，请查看解析结果"。
 4. 用户可查看解析结果（默认第一页），确认无误后可进入MD文档转化步骤。
